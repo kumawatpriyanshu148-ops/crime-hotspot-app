@@ -14,11 +14,8 @@ df['Date'] = pd.to_datetime(df['Date'])
 df['Hour'] = df['Date'].dt.hour
 
 # ---------------- SIDEBAR ----------------
-st.sidebar.header("Filters")
-
 crime_type = st.sidebar.selectbox("Crime Type", df['Crime_Type'].unique())
-
-city = st.sidebar.selectbox("Select City", ["Jaipur", "Delhi", "Mumbai"])
+city = st.sidebar.selectbox("City", ["Jaipur", "Delhi", "Mumbai"])
 
 city_coords = {
     "Jaipur": [26.9124, 75.7873],
@@ -27,9 +24,12 @@ city_coords = {
 }
 
 filtered_df = df[df['Crime_Type'] == crime_type]
-
 if filtered_df.empty:
     filtered_df = df
+
+# ---------------- SESSION STATE (IMPORTANT) ----------------
+if "map_data" not in st.session_state:
+    st.session_state.map_data = filtered_df.copy()
 
 # ---------------- SLIDERS ----------------
 st.subheader("Controls")
@@ -38,13 +38,15 @@ hour = st.slider("Hour", 0, 23, 12)
 temp = st.slider("Temperature", 10, 50, 25)
 pop = st.slider("Population", 100, 1000, 500)
 
-# ---------------- DYNAMIC EFFECT ----------------
-final_df = filtered_df.copy()
+# ---------------- APPLY EFFECT ONLY ON BUTTON ----------------
+if st.button("Update Map"):
+    new_df = filtered_df.copy()
 
-# Temperature → spread
-spread = temp / 1000  
-final_df['Latitude'] += np.random.normal(0, spread, len(final_df))
-final_df['Longitude'] += np.random.normal(0, spread, len(final_df))
+    spread = temp / 1000
+    new_df['Latitude'] += np.random.normal(0, spread, len(new_df))
+    new_df['Longitude'] += np.random.normal(0, spread, len(new_df))
+
+    st.session_state.map_data = new_df
 
 # ---------------- MAP ----------------
 st.subheader("🗺️ Crime Hotspots Map")
@@ -52,20 +54,21 @@ st.subheader("🗺️ Crime Hotspots Map")
 center = city_coords[city]
 crime_map = folium.Map(location=center, zoom_start=10)
 
-for i in range(len(final_df)):
-    lat = float(final_df.iloc[i]['Latitude'])
-    lon = float(final_df.iloc[i]['Longitude'])
+data = st.session_state.map_data
 
-    # 🔥 Hour → color logic
+for i in range(len(data)):
+    lat = float(data.iloc[i]['Latitude'])
+    lon = float(data.iloc[i]['Longitude'])
+
+    # Color by hour
     if hour > 18:
-        color = "red"      # night = high risk
+        color = "red"
     elif hour > 10:
-        color = "yellow"   # day = medium
+        color = "yellow"
     else:
-        color = "blue"     # morning = low
+        color = "blue"
 
-    # 🔥 Population → size
-    radius = pop / 150   # dynamic size
+    radius = pop / 150
 
     folium.CircleMarker(
         location=[lat, lon],
@@ -95,7 +98,4 @@ else:
 
 # ---------------- DATA ----------------
 st.subheader("📊 Data Preview")
-st.dataframe(final_df.head())
-
-st.markdown("---")
-st.write("Made by Priyanshu 🚀")
+st.dataframe(data.head())
