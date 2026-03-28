@@ -43,6 +43,10 @@ city_coords = {
 # Filter data
 filtered_df = df[df['Crime_Type'] == crime_type]
 
+# ✅ FIX: अगर data empty है तो पूरा dataset use करो
+if filtered_df.empty:
+    filtered_df = df
+
 st.metric("Total Crimes", len(filtered_df))
 
 # ---------------- MAP ----------------
@@ -68,7 +72,7 @@ def create_map(data, center):
 
 st.subheader("🗺️ Crime Hotspots Map")
 
-map_center = city_coords[city]   # 👈 dynamic location change
+map_center = city_coords[city]
 crime_map = create_map(filtered_df, map_center)
 
 st_folium(crime_map, width=900)
@@ -84,18 +88,17 @@ hour = st.slider("Select Hour", 0, 23, 12)
 temperature = st.slider("Temperature (°C)", 10, 50, 25)
 population = st.slider("Population Density", 100, 1000, 500)
 
-# ---------------- PREDICT ----------------
-if st.button("Predict"):
-    result = simple_prediction(hour, temperature, population)
+# ---------------- AUTO PREDICTION ----------------
+result = simple_prediction(hour, temperature, population)
 
-    st.success(f"Predicted Crime Level: {result:.2f}")
+st.success(f"Predicted Crime Level: {result:.2f}")
 
-    if result > 50:
-        st.error("HIGH RISK 🔴")
-    elif result > 20:
-        st.warning("MEDIUM RISK 🟡")
-    else:
-        st.success("LOW RISK 🟢")
+if result > 50:
+    st.error("HIGH RISK 🔴")
+elif result > 20:
+    st.warning("MEDIUM RISK 🟡")
+else:
+    st.success("LOW RISK 🟢")
 
 # ---------------- DATA ----------------
 st.subheader("📊 Data Preview")
