@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import folium
 from streamlit_folium import st_folium
+from sklearn.cluster import KMeans
 
 # ---------------- PAGE ----------------
 st.set_page_config(page_title="Crime Map", layout="wide")
@@ -14,7 +15,7 @@ try:
     df['Date'] = pd.to_datetime(df['Date'])
     df['Hour'] = df['Date'].dt.hour
 except:
-    st.error("⚠️ CSV not found! Using demo data")
+    st.error("CSV not found! Using demo data")
     df = pd.DataFrame({
         "Latitude": [26.91, 28.61, 19.07],
         "Longitude": [75.78, 77.20, 72.87],
@@ -26,7 +27,6 @@ except:
 st.sidebar.header("Filters")
 
 crime_type = st.sidebar.selectbox("Crime Type", df['Crime_Type'].unique())
-
 city = st.sidebar.selectbox("Select City", ["Jaipur", "Delhi", "Mumbai"])
 
 city_coords = {
@@ -47,52 +47,51 @@ hour = st.slider("Hour", 0, 23, 12)
 temp = st.slider("Temperature", 10, 50, 25)
 pop = st.slider("Population", 100, 1000, 500)
 
-# ---------------- FORCE DATA EFFECT ----------------
+# ---------------- DYNAMIC DATA ----------------
 np.random.seed(hour + int(temp) + int(pop))
 
 final_df = filtered_df.copy()
 
-# अगर data empty या खराब है → fallback
-if len(final_df) < 5:
+if len(final_df) < 10:
     final_df = pd.DataFrame({
-        "Latitude": np.random.uniform(26, 29, 100),
-        "Longitude": np.random.uniform(72, 78, 100)
+        "Latitude": np.random.uniform(26, 29, 200),
+        "Longitude": np.random.uniform(72, 78, 200)
     })
 
-# randomness add करो (visible effect)
-final_df['Latitude'] = final_df['Latitude'] + np.random.normal(0, 0.02, len(final_df))
-final_df['Longitude'] = final_df['Longitude'] + np.random.normal(0, 0.02, len(final_df))
+final_df['Latitude'] += np.random.normal(0, 0.02, len(final_df))
+final_df['Longitude'] += np.random.normal(0, 0.02, len(final_df))
 
-# ---------------- DEBUG ----------------
-st.write("Total Points:", len(final_df))
+# ---------------- CLUSTERING ----------------
+kmeans = KMeans(n_clusters=3, random_state=42)
+final_df['cluster'] = kmeans.fit_predict(final_df[['Latitude','Longitude']])
 
 # ---------------- MAP ----------------
-st.subheader("🗺️ Crime Map")
+st.subheader("🗺️ Crime Hotspots Map")
 
 center = city_coords[city]
 crime_map = folium.Map(location=center, zoom_start=10)
 
-# 🔥 GUARANTEED DOTS LOOP
+colors = ['red', 'yellow', 'blue']
+
 for i in range(len(final_df)):
     try:
+        lat = float(final_df.iloc[i]['Latitude'])
+        lon = float(final_df.iloc[i]['Longitude'])
+        cluster = int(final_df.iloc[i]['cluster'])
+
+        color = colors[cluster]
+
         folium.CircleMarker(
-            location=[float(final_df.iloc[i]['Latitude']), float(final_df.iloc[i]['Longitude'])],
+            location=[lat, lon],
             radius=7,
-            color='red',
+            color=color,
             fill=True,
+            fill_color=color,
             fill_opacity=0.7
         ).add_to(crime_map)
+
     except:
         pass
-
-# extra fallback dots (always visible)
-for lat, lon in zip(np.random.uniform(26, 29, 20), np.random.uniform(72, 78, 20)):
-    folium.CircleMarker(
-        location=[lat, lon],
-        radius=5,
-        color='blue',
-        fill=True
-    ).add_to(crime_map)
 
 st_folium(crime_map, width=900, height=500)
 
@@ -112,8 +111,9 @@ else:
     st.success("LOW RISK 🟢")
 
 # ---------------- DATA ----------------
-st.subheader("Data Preview")
+st.subheader("📊 Data Preview")
 st.dataframe(final_df.head())
 
+# ---------------- FOOTER ----------------
 st.markdown("---")
 st.write("Made by Priyanshu 🚀")
