@@ -45,13 +45,21 @@ if filtered_df.empty:
 
 st.metric("Total Crimes", len(filtered_df))
 
-# ---------------- SHIFT DATA FUNCTION ----------------
+# ---------------- SHIFT DATA ----------------
 def shift_data_to_city(data, center):
     data = data.copy()
     lat_shift = center[0] - data['Latitude'].mean()
     lon_shift = center[1] - data['Longitude'].mean()
-    data['Latitude'] = data['Latitude'] + lat_shift
-    data['Longitude'] = data['Longitude'] + lon_shift
+    data['Latitude'] += lat_shift
+    data['Longitude'] += lon_shift
+    return data
+
+# ---------------- SLIDER EFFECT ----------------
+def apply_dynamic_effect(data, hour, temp, pop):
+    data = data.copy()
+    np.random.seed(hour + int(temp) + int(pop))
+    data['Latitude'] += np.random.normal(0, 0.01, len(data))
+    data['Longitude'] += np.random.normal(0, 0.01, len(data))
     return data
 
 # ---------------- MAP ----------------
@@ -59,21 +67,7 @@ st.subheader("🗺️ Crime Hotspots Map")
 
 map_center = city_coords[city]
 
-# Apply shifting
 shifted_df = shift_data_to_city(filtered_df, map_center)
-
-# ---------------- DYNAMIC EFFECT (SLIDER IMPACT) ----------------
-# sliders map ko affect kare
-def apply_dynamic_effect(data, hour, temp, pop):
-    data = data.copy()
-
-    # randomness add based on sliders
-    np.random.seed(hour + int(temp) + int(pop))
-
-    data['Latitude'] += np.random.normal(0, 0.01, len(data))
-    data['Longitude'] += np.random.normal(0, 0.01, len(data))
-
-    return data
 
 # ---------------- INPUT ----------------
 st.subheader("🔮 Crime Prediction Controls")
@@ -82,7 +76,6 @@ hour = st.slider("Select Hour", 0, 23, 12)
 temperature = st.slider("Temperature (°C)", 10, 50, 25)
 population = st.slider("Population Density", 100, 1000, 500)
 
-# Apply slider effect
 final_df = apply_dynamic_effect(shifted_df, hour, temperature, population)
 
 # ---------------- CREATE MAP ----------------
@@ -110,17 +103,18 @@ crime_map = create_map(final_df, map_center)
 
 st_folium(crime_map, width=900)
 
-# ---------------- PREDICTION ----------------
+# ---------------- SIMPLE MODEL ----------------
 def simple_prediction(hour, temp, pop):
     return (hour * 2 + temp * 0.5 + pop * 0.01)
 
-result = simple_prediction(hour, temperature, population)
+raw = simple_prediction(hour, temperature, population)
 
-st.success(f"Predicted Crime Level: {result:.2f}")
+# ---------------- RISK BASED OUTPUT ----------------
+st.subheader("🚨 Risk Level")
 
-if result > 50:
+if raw > 60:
     st.error("HIGH RISK 🔴")
-elif result > 20:
+elif raw > 30:
     st.warning("MEDIUM RISK 🟡")
 else:
     st.success("LOW RISK 🟢")
