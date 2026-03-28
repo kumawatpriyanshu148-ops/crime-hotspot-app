@@ -9,18 +9,9 @@ st.set_page_config(page_title="Crime Map", layout="wide")
 st.title("🚓 Crime Hotspot Prediction System")
 
 # ---------------- LOAD DATA ----------------
-try:
-    df = pd.read_csv("crime_data.csv")
-    df['Date'] = pd.to_datetime(df['Date'])
-    df['Hour'] = df['Date'].dt.hour
-except:
-    st.error("CSV not found! Using demo data")
-    df = pd.DataFrame({
-        "Latitude": [26.91, 28.61, 19.07],
-        "Longitude": [75.78, 77.20, 72.87],
-        "Crime_Type": ["Theft", "Robbery", "Assault"],
-        "Date": pd.to_datetime(["2023-01-01"]*3)
-    })
+df = pd.read_csv("crime_data.csv")
+df['Date'] = pd.to_datetime(df['Date'])
+df['Hour'] = df['Date'].dt.hour
 
 # ---------------- SIDEBAR ----------------
 st.sidebar.header("Filters")
@@ -48,19 +39,12 @@ temp = st.slider("Temperature", 10, 50, 25)
 pop = st.slider("Population", 100, 1000, 500)
 
 # ---------------- DYNAMIC EFFECT ----------------
-np.random.seed(hour + int(temp) + int(pop))
-
 final_df = filtered_df.copy()
 
-if len(final_df) < 10:
-    final_df = pd.DataFrame({
-        "Latitude": np.random.uniform(26, 29, 200),
-        "Longitude": np.random.uniform(72, 78, 200)
-    })
-
-# small variation
-final_df['Latitude'] += np.random.normal(0, 0.02, len(final_df))
-final_df['Longitude'] += np.random.normal(0, 0.02, len(final_df))
+# Temperature → spread
+spread = temp / 1000  
+final_df['Latitude'] += np.random.normal(0, spread, len(final_df))
+final_df['Longitude'] += np.random.normal(0, spread, len(final_df))
 
 # ---------------- MAP ----------------
 st.subheader("🗺️ Crime Hotspots Map")
@@ -68,31 +52,29 @@ st.subheader("🗺️ Crime Hotspots Map")
 center = city_coords[city]
 crime_map = folium.Map(location=center, zoom_start=10)
 
-# 🔥 GUARANTEED MULTI COLOR DOTS
 for i in range(len(final_df)):
-    try:
-        lat = float(final_df.iloc[i]['Latitude'])
-        lon = float(final_df.iloc[i]['Longitude'])
+    lat = float(final_df.iloc[i]['Latitude'])
+    lon = float(final_df.iloc[i]['Longitude'])
 
-        # guaranteed color variation
-        if i % 3 == 0:
-            color = "red"
-        elif i % 3 == 1:
-            color = "yellow"
-        else:
-            color = "blue"
+    # 🔥 Hour → color logic
+    if hour > 18:
+        color = "red"      # night = high risk
+    elif hour > 10:
+        color = "yellow"   # day = medium
+    else:
+        color = "blue"     # morning = low
 
-        folium.CircleMarker(
-            location=[lat, lon],
-            radius=7,
-            color=color,
-            fill=True,
-            fill_color=color,
-            fill_opacity=0.7
-        ).add_to(crime_map)
+    # 🔥 Population → size
+    radius = pop / 150   # dynamic size
 
-    except:
-        pass
+    folium.CircleMarker(
+        location=[lat, lon],
+        radius=radius,
+        color=color,
+        fill=True,
+        fill_color=color,
+        fill_opacity=0.7
+    ).add_to(crime_map)
 
 st_folium(crime_map, width=900, height=500)
 
@@ -115,6 +97,5 @@ else:
 st.subheader("📊 Data Preview")
 st.dataframe(final_df.head())
 
-# ---------------- FOOTER ----------------
 st.markdown("---")
 st.write("Made by Priyanshu 🚀")
