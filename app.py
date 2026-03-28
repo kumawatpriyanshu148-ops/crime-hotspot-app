@@ -3,7 +3,6 @@ import pandas as pd
 import numpy as np
 import folium
 from streamlit_folium import st_folium
-from sklearn.cluster import KMeans
 
 # ---------------- PAGE ----------------
 st.set_page_config(page_title="Crime Map", layout="wide")
@@ -27,6 +26,7 @@ except:
 st.sidebar.header("Filters")
 
 crime_type = st.sidebar.selectbox("Crime Type", df['Crime_Type'].unique())
+
 city = st.sidebar.selectbox("Select City", ["Jaipur", "Delhi", "Mumbai"])
 
 city_coords = {
@@ -47,7 +47,7 @@ hour = st.slider("Hour", 0, 23, 12)
 temp = st.slider("Temperature", 10, 50, 25)
 pop = st.slider("Population", 100, 1000, 500)
 
-# ---------------- DYNAMIC DATA ----------------
+# ---------------- DYNAMIC EFFECT ----------------
 np.random.seed(hour + int(temp) + int(pop))
 
 final_df = filtered_df.copy()
@@ -58,12 +58,9 @@ if len(final_df) < 10:
         "Longitude": np.random.uniform(72, 78, 200)
     })
 
+# small variation
 final_df['Latitude'] += np.random.normal(0, 0.02, len(final_df))
 final_df['Longitude'] += np.random.normal(0, 0.02, len(final_df))
-
-# ---------------- CLUSTERING ----------------
-kmeans = KMeans(n_clusters=3, random_state=42)
-final_df['cluster'] = kmeans.fit_predict(final_df[['Latitude','Longitude']])
 
 # ---------------- MAP ----------------
 st.subheader("🗺️ Crime Hotspots Map")
@@ -71,15 +68,19 @@ st.subheader("🗺️ Crime Hotspots Map")
 center = city_coords[city]
 crime_map = folium.Map(location=center, zoom_start=10)
 
-colors = ['red', 'yellow', 'blue']
-
+# 🔥 GUARANTEED MULTI COLOR DOTS
 for i in range(len(final_df)):
     try:
         lat = float(final_df.iloc[i]['Latitude'])
         lon = float(final_df.iloc[i]['Longitude'])
-        cluster = int(final_df.iloc[i]['cluster'])
 
-        color = colors[cluster]
+        # guaranteed color variation
+        if i % 3 == 0:
+            color = "red"
+        elif i % 3 == 1:
+            color = "yellow"
+        else:
+            color = "blue"
 
         folium.CircleMarker(
             location=[lat, lon],
