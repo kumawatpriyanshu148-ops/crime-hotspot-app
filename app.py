@@ -3,14 +3,12 @@ import pandas as pd
 import numpy as np
 import folium
 from streamlit_folium import st_folium
-from sklearn.cluster import KMeans
 
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(page_title="Crime Prediction", layout="wide")
 st.title("🚓 Crime Hotspot Prediction System")
 
 # ---------------- LOAD DATA ----------------
-@st.cache_data
 def load_data():
     df = pd.read_csv("crime_data.csv")
     df['Date'] = pd.to_datetime(df['Date'])
@@ -54,7 +52,14 @@ def shift_data_to_city(data, center):
     data['Longitude'] += lon_shift
     return data
 
-# ---------------- SLIDER EFFECT ----------------
+# ---------------- INPUT ----------------
+st.subheader("🔮 Crime Controls")
+
+hour = st.slider("Select Hour", 0, 23, 12)
+temperature = st.slider("Temperature (°C)", 10, 50, 25)
+population = st.slider("Population Density", 100, 1000, 500)
+
+# ---------------- APPLY EFFECT ----------------
 def apply_dynamic_effect(data, hour, temp, pop):
     data = data.copy()
     np.random.seed(hour + int(temp) + int(pop))
@@ -62,54 +67,39 @@ def apply_dynamic_effect(data, hour, temp, pop):
     data['Longitude'] += np.random.normal(0, 0.01, len(data))
     return data
 
-# ---------------- MAP ----------------
-st.subheader("🗺️ Crime Hotspots Map")
-
 map_center = city_coords[city]
 
 shifted_df = shift_data_to_city(filtered_df, map_center)
-
-# ---------------- INPUT ----------------
-st.subheader("🔮 Crime Prediction Controls")
-
-hour = st.slider("Select Hour", 0, 23, 12)
-temperature = st.slider("Temperature (°C)", 10, 50, 25)
-population = st.slider("Population Density", 100, 1000, 500)
-
 final_df = apply_dynamic_effect(shifted_df, hour, temperature, population)
 
-# ---------------- CREATE MAP ----------------
-def create_map(data, center):
-    X = data[['Latitude', 'Longitude']]
-    kmeans = KMeans(n_clusters=4, random_state=42)
-    data = data.copy()
-    data['Cluster'] = kmeans.fit_predict(X)
+# ---------------- DEBUG ----------------
+st.write("Total Points:", len(final_df))
 
-    crime_map = folium.Map(location=center, zoom_start=11)
+# ---------------- CREATE MAP (FIXED) ----------------
+def create_map(data, center):
+    crime_map = folium.Map(location=center, zoom_start=10)
 
     for _, row in data.iterrows():
-        color = 'red' if row['Cluster'] == 0 else 'blue'
-
         folium.CircleMarker(
             location=[row['Latitude'], row['Longitude']],
-            radius=6,
-            color=color,
+            radius=8,
+            color='red',
             fill=True
         ).add_to(crime_map)
 
     return crime_map
 
-crime_map = create_map(final_df, map_center)
+st.subheader("🗺️ Crime Hotspots Map")
 
+crime_map = create_map(final_df, map_center)
 st_folium(crime_map, width=900)
 
-# ---------------- SIMPLE MODEL ----------------
+# ---------------- PREDICTION ----------------
 def simple_prediction(hour, temp, pop):
     return (hour * 2 + temp * 0.5 + pop * 0.01)
 
 raw = simple_prediction(hour, temperature, population)
 
-# ---------------- RISK BASED OUTPUT ----------------
 st.subheader("🚨 Risk Level")
 
 if raw > 60:
