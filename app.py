@@ -21,21 +21,39 @@ df = load_data()
 
 # ---------------- SIDEBAR ----------------
 st.sidebar.header("🔍 Filters")
+
+# Crime type filter
 crime_type = st.sidebar.selectbox("Crime Type", df['Crime_Type'].unique())
+
+# Location dropdown
+st.sidebar.header("📍 Select Location")
+
+city = st.sidebar.selectbox(
+    "Choose City",
+    ["Jaipur", "Delhi", "Mumbai"]
+)
+
+# City coordinates
+city_coords = {
+    "Jaipur": [26.9124, 75.7873],
+    "Delhi": [28.6139, 77.2090],
+    "Mumbai": [19.0760, 72.8777]
+}
+
+# Filter data
 filtered_df = df[df['Crime_Type'] == crime_type]
 
 st.metric("Total Crimes", len(filtered_df))
 
 # ---------------- MAP ----------------
 @st.cache_data
-def create_map(data):
+def create_map(data, center):
     X = data[['Latitude', 'Longitude']]
     kmeans = KMeans(n_clusters=4, random_state=42)
     data = data.copy()
     data['Cluster'] = kmeans.fit_predict(X)
 
-    map_center = [data['Latitude'].mean(), data['Longitude'].mean()]
-    crime_map = folium.Map(location=map_center, zoom_start=12)
+    crime_map = folium.Map(location=center, zoom_start=11)
 
     for _, row in data.iterrows():
         color = 'red' if row['Cluster'] == 0 else 'blue'
@@ -49,10 +67,13 @@ def create_map(data):
     return crime_map
 
 st.subheader("🗺️ Crime Hotspots Map")
-crime_map = create_map(filtered_df)
+
+map_center = city_coords[city]   # 👈 dynamic location change
+crime_map = create_map(filtered_df, map_center)
+
 st_folium(crime_map, width=900)
 
-# ---------------- SIMPLE PREDICTION (NO TF) ----------------
+# ---------------- SIMPLE PREDICTION ----------------
 def simple_prediction(hour, temp, pop):
     return (hour * 2 + temp * 0.5 + pop * 0.01)
 
