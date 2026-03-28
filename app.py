@@ -22,10 +22,8 @@ df = load_data()
 # ---------------- SIDEBAR ----------------
 st.sidebar.header("🔍 Filters")
 
-# Crime type filter
 crime_type = st.sidebar.selectbox("Crime Type", df['Crime_Type'].unique())
 
-# Location dropdown
 st.sidebar.header("📍 Select Location")
 
 city = st.sidebar.selectbox(
@@ -33,24 +31,61 @@ city = st.sidebar.selectbox(
     ["Jaipur", "Delhi", "Mumbai"]
 )
 
-# City coordinates
 city_coords = {
     "Jaipur": [26.9124, 75.7873],
     "Delhi": [28.6139, 77.2090],
     "Mumbai": [19.0760, 72.8777]
 }
 
-# Filter data
+# ---------------- FILTER DATA ----------------
 filtered_df = df[df['Crime_Type'] == crime_type]
 
-# ✅ FIX: अगर data empty है तो पूरा dataset use करो
 if filtered_df.empty:
     filtered_df = df
 
 st.metric("Total Crimes", len(filtered_df))
 
+# ---------------- SHIFT DATA FUNCTION ----------------
+def shift_data_to_city(data, center):
+    data = data.copy()
+    lat_shift = center[0] - data['Latitude'].mean()
+    lon_shift = center[1] - data['Longitude'].mean()
+    data['Latitude'] = data['Latitude'] + lat_shift
+    data['Longitude'] = data['Longitude'] + lon_shift
+    return data
+
 # ---------------- MAP ----------------
-@st.cache_data
+st.subheader("🗺️ Crime Hotspots Map")
+
+map_center = city_coords[city]
+
+# Apply shifting
+shifted_df = shift_data_to_city(filtered_df, map_center)
+
+# ---------------- DYNAMIC EFFECT (SLIDER IMPACT) ----------------
+# sliders map ko affect kare
+def apply_dynamic_effect(data, hour, temp, pop):
+    data = data.copy()
+
+    # randomness add based on sliders
+    np.random.seed(hour + int(temp) + int(pop))
+
+    data['Latitude'] += np.random.normal(0, 0.01, len(data))
+    data['Longitude'] += np.random.normal(0, 0.01, len(data))
+
+    return data
+
+# ---------------- INPUT ----------------
+st.subheader("🔮 Crime Prediction Controls")
+
+hour = st.slider("Select Hour", 0, 23, 12)
+temperature = st.slider("Temperature (°C)", 10, 50, 25)
+population = st.slider("Population Density", 100, 1000, 500)
+
+# Apply slider effect
+final_df = apply_dynamic_effect(shifted_df, hour, temperature, population)
+
+# ---------------- CREATE MAP ----------------
 def create_map(data, center):
     X = data[['Latitude', 'Longitude']]
     kmeans = KMeans(n_clusters=4, random_state=42)
@@ -61,34 +96,24 @@ def create_map(data, center):
 
     for _, row in data.iterrows():
         color = 'red' if row['Cluster'] == 0 else 'blue'
+
         folium.CircleMarker(
             location=[row['Latitude'], row['Longitude']],
-            radius=5,
+            radius=6,
             color=color,
             fill=True
         ).add_to(crime_map)
 
     return crime_map
 
-st.subheader("🗺️ Crime Hotspots Map")
-
-map_center = city_coords[city]
-crime_map = create_map(filtered_df, map_center)
+crime_map = create_map(final_df, map_center)
 
 st_folium(crime_map, width=900)
 
-# ---------------- SIMPLE PREDICTION ----------------
+# ---------------- PREDICTION ----------------
 def simple_prediction(hour, temp, pop):
     return (hour * 2 + temp * 0.5 + pop * 0.01)
 
-# ---------------- INPUT ----------------
-st.subheader("🔮 Crime Prediction")
-
-hour = st.slider("Select Hour", 0, 23, 12)
-temperature = st.slider("Temperature (°C)", 10, 50, 25)
-population = st.slider("Population Density", 100, 1000, 500)
-
-# ---------------- AUTO PREDICTION ----------------
 result = simple_prediction(hour, temperature, population)
 
 st.success(f"Predicted Crime Level: {result:.2f}")
@@ -102,7 +127,7 @@ else:
 
 # ---------------- DATA ----------------
 st.subheader("📊 Data Preview")
-st.dataframe(filtered_df.head())
+st.dataframe(final_df.head())
 
 # ---------------- FOOTER ----------------
 st.markdown("---")
