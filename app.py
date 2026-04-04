@@ -27,18 +27,35 @@ filtered_df = df[df['Crime_Type'] == crime_type]
 if filtered_df.empty:
     filtered_df = df
 
-# ---------------- SESSION STATE (IMPORTANT) ----------------
+# ---------------- SESSION ----------------
 if "map_data" not in st.session_state:
     st.session_state.map_data = filtered_df.copy()
 
-# ---------------- SLIDERS ----------------
+# ---------------- CONTROLS ----------------
 st.subheader("Controls")
 
 hour = st.slider("Hour", 0, 23, 12)
 temp = st.slider("Temperature", 10, 50, 25)
 pop = st.slider("Population", 100, 1000, 500)
 
-# ---------------- APPLY EFFECT ONLY ON BUTTON ----------------
+# ---------------- PREDICTION ----------------
+def predict(h, t, p):
+    return h*2 + t*0.5 + p*0.01
+
+score = predict(hour, temp, pop)
+
+# ---------------- RISK COLOR ----------------
+if score > 60:
+    risk_text = "HIGH RISK 🔴"
+    dot_color = "red"
+elif score > 30:
+    risk_text = "MEDIUM RISK 🟠"
+    dot_color = "orange"
+else:
+    risk_text = "LOW RISK 🟡"
+    dot_color = "yellow"
+
+# ---------------- UPDATE MAP ----------------
 if st.button("Update Map"):
     new_df = filtered_df.copy()
 
@@ -60,41 +77,27 @@ for i in range(len(data)):
     lat = float(data.iloc[i]['Latitude'])
     lon = float(data.iloc[i]['Longitude'])
 
-    # Color by hour
-    if hour > 18:
-        color = "red"
-    elif hour > 10:
-        color = "yellow"
-    else:
-        color = "blue"
-
     radius = pop / 150
 
     folium.CircleMarker(
         location=[lat, lon],
         radius=radius,
-        color=color,
+        color=dot_color,
         fill=True,
-        fill_color=color,
+        fill_color=dot_color,
         fill_opacity=0.7
     ).add_to(crime_map)
 
 st_folium(crime_map, width=900, height=500)
 
-# ---------------- RISK ----------------
-def predict(h, t, p):
-    return h*2 + t*0.5 + p*0.01
-
-score = predict(hour, temp, pop)
-
+# ---------------- RISK DISPLAY ----------------
 st.subheader("🚨 Risk Level")
-
 if score > 60:
-    st.error("HIGH RISK 🔴")
+    st.error(risk_text)
 elif score > 30:
-    st.warning("MEDIUM RISK 🟡")
+    st.warning(risk_text)
 else:
-    st.success("LOW RISK 🟢")
+    st.success(risk_text)
 
 # ---------------- DATA ----------------
 st.subheader("📊 Data Preview")
