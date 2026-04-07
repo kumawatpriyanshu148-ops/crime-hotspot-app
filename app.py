@@ -51,10 +51,9 @@ lon_shift = center[1] - final_df["Longitude"].mean()
 final_df["Latitude"] += lat_shift + np.random.normal(0, spread, len(final_df))
 final_df["Longitude"] += lon_shift + np.random.normal(0, spread, len(final_df))
 
-st.subheader("🗺️ Crime + Nearby Police Stations")
+st.subheader("🗺️ Crime Hotspots Map")
 crime_map = folium.Map(location=center, zoom_start=11)
-cluster = MarkerCluster().add_to(crime_map)
-
+# visible risk dots (direct on map for guaranteed rendering)
 for i, row in final_df.iterrows():
     lat = float(row["Latitude"])
     lon = float(row["Longitude"])
@@ -69,13 +68,14 @@ for i, row in final_df.iterrows():
 
     folium.CircleMarker(
         location=[lat, lon],
-        radius=5,
+        radius=6,
         color=color,
         fill=True,
         fill_color=color,
-        fill_opacity=0.75,
+        fill_opacity=0.9,
+        weight=2,
         popup=f"Risk: {risk_score:.1f}"
-    ).add_to(cluster)
+    ).add_to(crime_map)
 
 for lat, lon, name in police_stations[city]:
     folium.Marker(
