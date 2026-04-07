@@ -28,29 +28,21 @@ city_coords = {
     "Mumbai": [19.0760, 72.8777]
 }
 
-# 🚓 multiple police stations
+# 🚓 police stations
 police_stations = {
     "Jaipur": [
         (26.923, 75.800, "Vaishali Nagar Police Station"),
-        (26.905, 75.775, "Mansarovar Police Station"),
-        (26.930, 75.820, "Vidyadhar Nagar Police Station")
+        (26.905, 75.775, "Mansarovar Police Station")
     ],
     "Delhi": [
         (28.620, 77.220, "Connaught Place Police Station"),
-        (28.600, 77.190, "Karol Bagh Police Station"),
-        (28.640, 77.230, "Civil Lines Police Station")
+        (28.600, 77.190, "Karol Bagh Police Station")
     ],
     "Mumbai": [
         (19.080, 72.880, "Andheri Police Station"),
-        (19.060, 72.860, "Bandra Police Station"),
-        (19.100, 72.900, "Powai Police Station")
+        (19.060, 72.860, "Bandra Police Station")
     ]
 }
-
-# ---------------- FILTER ----------------
-filtered_df = df[df["Crime_Type"] == crime_type].copy()
-if filtered_df.empty:
-    filtered_df = df.copy()
 
 # ---------------- CONTROLS ----------------
 st.subheader("🎛️ Prediction Controls")
@@ -58,22 +50,32 @@ hour = st.slider("Hour", 0, 23, 0)
 temp = st.slider("Temperature (°C)", 10, 50, 25)
 pop = st.slider("Population Density", 100, 1000, 500)
 
-# ---------------- DYNAMIC CITY SHIFT ----------------
 center = city_coords[city]
-spread = temp / 1200
+spread = temp / 1500
+num_dots = 150
 
-seed_val = hour + temp + pop + abs(hash(city)) % 1000
+# ---------------- CRIME TYPE SPECIFIC HOTSPOTS ----------------
+crime_offsets = {
+    "Assault": (0.04, 0.04),     # nightlife area
+    "Robbery": (-0.04, 0.03),    # road/market area
+    "Theft": (0.03, -0.04),      # shopping area
+    "Burglary": (-0.03, -0.03)   # residential side
+}
+
+lat_offset, lon_offset = crime_offsets.get(crime_type, (0, 0))
+
+seed_val = hour + temp + pop + abs(hash(city + crime_type)) % 1000
 np.random.seed(seed_val)
 
-num_dots = min(150, len(filtered_df))
-final_df = filtered_df.sample(num_dots, random_state=seed_val).copy()
+lat_center = center[0] + lat_offset
+lon_center = center[1] + lon_offset
 
-final_df["Latitude"] = center[0] + np.random.normal(0, 0.05, num_dots)
-final_df["Longitude"] = center[1] + np.random.normal(0, 0.05, num_dots)
+final_df = pd.DataFrame({
+    "Latitude": lat_center + np.random.normal(0, 0.03 + spread, num_dots),
+    "Longitude": lon_center + np.random.normal(0, 0.03 + spread, num_dots)
+})
 
-# ---------------- TIME-BASED RISK RATIO ----------------
-# hour=0 => G75 Y20 R5
-# hour=23 => R75 Y15 G10
+# ---------------- TIME BASED COLOR MIX ----------------
 red_ratio = 0.05 + (hour / 23) * 0.70
 yellow_ratio = 0.20 - (hour / 23) * 0.05
 green_ratio = 1 - red_ratio - yellow_ratio
@@ -94,23 +96,20 @@ np.random.shuffle(colors)
 st.subheader("🗺️ Crime Hotspots Map")
 crime_map = folium.Map(location=center, zoom_start=12)
 
-for idx, row in final_df.reset_index(drop=True).iterrows():
-    lat = float(row["Latitude"])
-    lon = float(row["Longitude"])
+for idx, row in final_df.iterrows():
     color = colors[idx]
 
     folium.CircleMarker(
-        location=[lat, lon],
+        location=[row["Latitude"], row["Longitude"]],
         radius=max(5, pop / 220),
         color=color,
         fill=True,
         fill_color=color,
         fill_opacity=1.0,
-        weight=2,
-        popup=f"{color.upper()} Risk"
+        popup=f"{crime_type} - {color.upper()} Risk"
     ).add_to(crime_map)
 
-# 🚓 police stations
+# police stations
 for lat, lon, name in police_stations[city]:
     folium.Marker(
         [lat, lon],
@@ -125,7 +124,7 @@ st.subheader("🚨 SOS Emergency")
 if st.button("🚨 Send SOS Alert"):
     st.error(f"SOS SENT 🚓 Alert sent to {police_stations[city][0][2]}")
 
-# ---------------- STATS ----------------
+# ---------------- RISK STATS ----------------
 st.subheader("📊 Risk Distribution")
 col1, col2, col3 = st.columns(3)
 
